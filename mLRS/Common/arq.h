@@ -10,7 +10,7 @@
 #define ARQ_H
 #pragma once
 
-#define USE_ARQ // just for the moment, eventually should go
+#define USE_ARQ
 //#define USE_ARQ_DBG
 #define USE_ARQ_RETRY_CNT     -1 // -1: set by SetRetryCnt(), 0 = off, 255 = infinite,
 #define USE_ARQ_TX_SIM_MISS   4 //9 // 0 = off
@@ -192,24 +192,22 @@ void tTransmitArq::SetRetryCnt(uint8_t retry_cnt)
 void tTransmitArq::SetRetryCntAuto(int32_t _frame_cnt, uint8_t mode)
 {
     switch (mode) {
-    case MODE_FLRC_111HZ: // 3 -> 2 -> 1
-        if (_frame_cnt >= 800) {
-            SetRetryCnt(3);
-        } else if (_frame_cnt >= 700) {
-            SetRetryCnt(2);
-        } else {
-            SetRetryCnt(1);
-        }
-        break;
-    case MODE_FSK_50HZ: // 2 -> 1
+    case MODE_FLRC_111HZ:
+        // aggressive: tolerate up to 5 lost slots (~45ms @ 111Hz)
+        SetRetryCnt(5);
+        return;
+    case MODE_FSK_50HZ:
     case MODE_50HZ:
     case MODE_31HZ:
     case MODE_19HZ:
     case MODE_19HZ_7X:
-        SetRetryCnt((_frame_cnt >= 800) ? 2 : 1);
+        // aggressive: tolerate up to 5 lost slots
+        // 50Hz: ~100ms burst, 31Hz: ~160ms, 19Hz: ~260ms
+        SetRetryCnt(5);
+        return;
     }
 
-    SetRetryCnt(1); // should never be called
+    SetRetryCnt(1); // fallback for unknown modes
 }
 
 
