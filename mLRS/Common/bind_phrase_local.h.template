@@ -1,0 +1,16 @@
+//*******************************************************
+// Local bind phrase template
+//*******************************************************
+// Copy this file to bind_phrase_local.h (same directory) and set your own
+// phrase. The copy is git-ignored, so real pairing keys never leave this
+// machine — the fork is public.
+//
+//   cp bind_phrase_local.h.template bind_phrase_local.h
+//
+// String of 6 characters, allowed are 'a'-'z','0'-'9','_','-','#','.'
+// Note: SETUP_FORCE_COMMON_CONF is enabled, so this value overrides whatever
+// is stored in EEPROM — both tx and rx must be flashed with the same phrase.
+//*******************************************************
+#pragma once
+
+#define BIND_PHRASE                     "mlrs.0"

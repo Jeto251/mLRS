@@ -68,7 +68,11 @@ IRAM_ATTR void sx_amp_receive(void)
     gpio_high(SX_RX_EN);
 }
 
-void sx_dio_init_exti_isroff(void) { detachInterrupt(SX_DIO); }
+void sx_dio_init_exti_isroff(void)
+{
+    gpio_install_isr_service(0);  // workaround: ensure GPIO ISR service exists before detachInterrupt
+    detachInterrupt(SX_DIO);
+}
 void sx_dio_enable_exti_isr(void) { attachInterrupt(SX_DIO, SX_DIO_EXTI_IRQHandler, RISING); }
 IRAM_ATTR void sx_dio_exti_isr_clearflag(void) {}
 
@@ -111,7 +115,11 @@ IRAM_ATTR void sx2_amp_receive(void)
     gpio_high(SX2_RX_EN);
 }
 
-void sx2_dio_init_exti_isroff(void) { detachInterrupt(SX2_DIO); }
+void sx2_dio_init_exti_isroff(void)
+{
+    gpio_install_isr_service(0);  // workaround: ensure GPIO ISR service exists before detachInterrupt
+    detachInterrupt(SX2_DIO);
+}
 void sx2_dio_enable_exti_isr(void) { attachInterrupt(SX2_DIO, SX2_DIO_EXTI_IRQHandler, RISING); }
 IRAM_ATTR void sx2_dio_exti_isr_clearflag(void) {}
 
@@ -150,6 +158,8 @@ IRAM_ATTR bool button_pressed(void)
 const rfpower_t rfpower_list[] = {
     { .dbm = POWER_0_DBM, .mW =  1 },
     { .dbm = POWER_10_DBM, .mW = 10 },
+    { .dbm = POWER_15_DBM, .mW = 32 },
+    { .dbm = POWER_17_DBM, .mW = 50 },
     { .dbm = POWER_20_DBM, .mW = 100 },
 };
 

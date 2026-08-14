@@ -39,10 +39,10 @@
 // user can modify them to their liking
 
 // un-comment to force setup to the below defines, else setup is taken from EEPROM
-//#define SETUP_FORCE_COMMON_CONF
+#define SETUP_FORCE_COMMON_CONF   // winch/skypuff: fix config from this file, ignore EEPROM
 
 
-#define CPOWER                          RFPOWER_DEFAULT
+#define CPOWER                          255
 //#define CPOWER                          0 // 0: minimum power, 255: maximum power
 
 #define DIVERSITY                       0
@@ -51,13 +51,13 @@
 #define SETUP_TX_SERIAL_PORT            0 // 0: serial port, 1: wbridge (BT/ESP) port, 2: serial2, 3: com, 4: crsfbridge
 #define SETUP_TX_SERIAL_PORT2           0 // 0: none, 1: serial port, 2: wbridge (BT/ESP) port, 3: serial2, 4: crsfbridge
 
-#define SETUP_TX_CHANNELS_SOURCE        1 // 0: none, 1: Crsf (pin5), 2: In (In or pin1)
+#define SETUP_TX_CHANNELS_SOURCE        0 // 0: none, 1: Crsf (pin5), 2: In (In or pin1)
 
 #define SETUP_TX_CHANNEL_ORDER          CHANNEL_ORDER_AETR
 
 #define SETUP_TX_IN_MODE                0 // 0: IN_CONFIG_SBUS, 1: IN_CONFIG_SBUS_INVERTED
 
-#define SETUP_TX_SERIAL_BAUDRATE        1 // 0: 57600, 1: 115200, 2: 230400
+#define SETUP_TX_SERIAL_BAUDRATE        2 // 0: 57600, 1: 115200, 2: 230400
 
 #define SETUP_TX_POWER                  CPOWER
 
@@ -77,30 +77,39 @@
 
 #define SETUP_RX_SERIAL_PORT            0 // 0: serial, 1: can, 2: canfd
 
-#define SETUP_RX_SERIAL_BAUDRATE        0 // 0: 57600, 1: 115200, 2: 230400
+#define SETUP_RX_SERIAL_BAUDRATE        2 // 0: 57600, 1: 115200, 2: 230400
 
 #define SETUP_RX_POWER                  CPOWER
 
 #define SETUP_RX_DIVERSITY              DIVERSITY // 0: default, 1: ANTENNA 1 if diversity available, 2: ANTENNA 2 if diversity available
 
-#define SETUP_RX_SERIAL_LINK_MODE       2 // 0: transparent, 1: mavlink, 2: mavlinkX, 3: mspX
+#define SETUP_RX_SERIAL_LINK_MODE       0 // 0: transparent, 1: mavlink, 2: mavlinkX, 3: mspX
 
 #define SETUP_RX_MAVLINK_SYSTEM_ID      0 // 0: 51, 1: 52, 2: 53, 3: 54, 4: 55  // SiK uses 51, 68
-#define SETUP_RX_SEND_RADIO_STATUS      1 // 0: off, 1: ardu_1, 2: px4 aka "brad"
+#define SETUP_RX_SEND_RADIO_STATUS      0 // 0: off, 1: ardu_1, 2: px4 aka "brad"
 #define SETUP_RX_SEND_RC_CHANNELS       0 // 0: off, 1: RC_CHANNEL_OVERRIDE, 2: RC_CHANNELS
 
 #define SETUP_RX_OUT_RSSI_CHANNEL       0 // 0: off, 5: CH5, 16: CH16
 #define SETUP_RX_OUT_LQ_CHANNEL         0 // 0: off, 5: CH5, 16: CH16
 
+//python3 ~/Documents/mLRS-Flasher/thirdparty/esptool/esptool.py  --port /dev/ttyUSB0 erase_flash
 
-#define BIND_PHRASE                     "mlrs.0" // string of 6 characters, allowed are 'a'-'z','0'-'9','_','-','#','.'
+// BIND_PHRASE lives in an untracked local header — this fork is public.
+// See bind_phrase_local.h.template for how to create it.
+#if __has_include("bind_phrase_local.h")
+    #include "bind_phrase_local.h"
+#else
+    #error "bind_phrase_local.h is missing - copy bind_phrase_local.h.template and set BIND_PHRASE"
+#endif
 
-#define SETUP_MODE                      MODE_50HZ
+
+// #define SETUP_MODE                      MODE_50HZ
 //#define SETUP_MODE                      MODE_31HZ
-//#define SETUP_MODE                      MODE_19HZ
+#define SETUP_MODE                      MODE_19HZ // max sensitivity for winch range
 
 //#define SETUP_RF_BAND                   SETUP_FREQUENCY_BAND_915_MHZ_FCC
-#define SETUP_RF_BAND                   SETUP_FREQUENCY_BAND_868_MHZ // that's my privilege :)
+//#define SETUP_RF_BAND                   SETUP_FREQUENCY_BAND_868_MHZ
+#define SETUP_RF_BAND                   SETUP_FREQUENCY_BAND_2P4_GHZ // RP4TD is 2.4 GHz
 
 #define SETUP_RF_ORTHO                  0 // 0: off, 1: 1/3, 2: 2/3, 3: 3/3
 #define SETUP_PRIVACY                   0 // 0: off, 1: lvl1, 2: lvl2, 3: lvl3
@@ -142,7 +151,7 @@
 
 #define CONNECT_TMO_MS                  1250 // time to disconnect, was 500, then 750 to better handle 19 Hz mode, now 1250
 
-#define CONNECT_SYNC_CNT                5 // number of packets to connect
+#define CONNECT_SYNC_CNT                2 // number of packets to connect
 
 #define LQ_AVERAGING_MS                 1000
 
