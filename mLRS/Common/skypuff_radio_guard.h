@@ -13,6 +13,7 @@
 #pragma once
 
 #include <inttypes.h>
+#include "skypuff_trace.h"
 
 
 #if defined SKYPUFF_BUSY_TMO_US && defined DEVICE_IS_TRANSMITTER
@@ -42,6 +43,7 @@ static uint32_t skypuff_radio_restart_ms = 0;
 void skypuff_busy_timeout(void)
 {
     if (skypuff_busy_timeouts < UINT16_MAX) skypuff_busy_timeouts++;
+    if (skypuff_busy_timeouts <= 20) SKYPUFF_TRACE("busy timeout %u", skypuff_busy_timeouts);
 
     uint32_t tnow_ms = millis32();
     if (tnow_ms - skypuff_busy_tmo_window_ms > SKYPUFF_BUSY_TMO_WINDOW_MS) {
@@ -60,11 +62,13 @@ uint8_t skypuff_radio_guard_action(void)
 
     uint32_t tnow_ms = millis32();
     if (skypuff_radio_restarted_once && tnow_ms - skypuff_radio_restart_ms < SKYPUFF_RADIO_RESTART_HELD_MS) {
+        SKYPUFF_TRACE("radio guard: reboot");
         return SKYPUFF_RADIO_REBOOT;
     }
     skypuff_radio_restarted_once = true;
     skypuff_radio_restart_ms = tnow_ms;
     if (skypuff_radio_restarts < UINT8_MAX) skypuff_radio_restarts++;
+    SKYPUFF_TRACE("radio guard: restart");
     return SKYPUFF_RADIO_RESTART;
 }
 

@@ -32,6 +32,14 @@
 // Serial Classes
 //-------------------------------------------------------
 
+// skypuff: every byte the board sends passes skypuff_updater_sniff(), see skypuff_updater.h
+#if defined ESP32 && defined SKYPUFF_UPDATER_WINDOW_MS
+void skypuff_updater_sniff(char c);
+#define SKYPUFF_UPDATER_SNIFF(c)  skypuff_updater_sniff(c)
+#else
+#define SKYPUFF_UPDATER_SNIFF(c)
+#endif
+
 // tx: serial
 // rx: serial
 class tUartBPort : public tSerialBase
@@ -43,8 +51,13 @@ class tUartBPort : public tSerialBase
     bool full(void) override { return !uartb_tx_notfull(); }
     void putbuf(uint8_t* const buf, uint16_t len) override { uartb_putbuf(buf, len); }
     bool available(void) override { return uartb_rx_available(); }
-    char getc(void) override { return uartb_getc(); }
+    char getc(void) override { char c = uartb_getc(); SKYPUFF_UPDATER_SNIFF(c); return c; }
+#if defined ESP32 && defined SKYPUFF_UPDATER_WINDOW_MS
+    // while the link is down all gets dropped here, the board's restart request too
+    void flush(void) override { while (uartb_rx_available()) SKYPUFF_UPDATER_SNIFF(uartb_getc()); uartb_tx_flush(); }
+#else
     void flush(void) override { uartb_rx_flush(); uartb_tx_flush(); }
+#endif
     uint16_t bytes_available(void) override { return uartb_rx_bytesavailable(); }
     bool has_systemboot(void) override { return uartb_has_systemboot(); }
 #endif

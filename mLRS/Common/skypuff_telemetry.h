@@ -15,6 +15,7 @@
 #include "skypuff_frame.h"
 #include "skypuff_crash.h"
 #include "skypuff_radio_guard.h"
+#include "skypuff_bind.h"
 #ifdef ESP32
 #include <esp_system.h>
 #endif
@@ -65,6 +66,10 @@ class tSkypuffAdcState
 };
 
 
+// The board restarted without the module and asks again, see skypuff_updater_sniff()
+volatile bool skypuff_module_info_requested = false;
+
+
 class tSkypuffTelemetry
 {
   public:
@@ -75,6 +80,7 @@ class tSkypuffTelemetry
         src = _src;
         mid_frame = false;
         seq = 0;
+        info_left = SKYPUFF_MODULE_INFO_FRAMES;
         tlast_send_ms = millis32();
         tlast_byte_ms = tlast_send_ms;
 #ifdef ESP32
@@ -152,9 +158,36 @@ class tSkypuffTelemetry
         uint16_t len = skypuff_frame_encode(SKYPUFF_FRAME_TYPE_LINK_STATUS, src, seq++,
                                             &status, sizeof(status), encoded);
         ser->putbuf(encoded, len);
+
+        // What doesn't change, only at the start and on request
+        if (skypuff_module_info_requested) {
+            skypuff_module_info_requested = false;
+            if (!info_left) info_left = 1;
+        }
+        if (info_left) {
+            info_left--;
+            send_module_info();
+        }
     }
 
   private:
+    void send_module_info(void)
+    {
+        tSkypuffModuleInfo info = {};
+        info.build_id = skypuff_build_id();
+        strncpy(info.version, VERSIONONLYSTR, sizeof(info.version));
+#ifdef ESP32
+        memcpy(info.bind_phrase, skypuff_bind_phrase, strlen(skypuff_bind_phrase));
+#endif
+#ifdef SKYPUFF_BIND_UNIVERSAL
+        info.universal = 1;
+#endif
+        uint8_t encoded[SKYPUFF_FRAME_MAX_ENCODED_LEN];
+        uint16_t len = skypuff_frame_encode(SKYPUFF_FRAME_TYPE_MODULE_INFO, src, seq++,
+                                            &info, sizeof(info), encoded);
+        ser->putbuf(encoded, len);
+    }
+
     int8_t read_temperature(void)
     {
 #ifdef ESP32
@@ -171,6 +204,7 @@ class tSkypuffTelemetry
     uint8_t src;
     bool mid_frame;
     uint8_t seq;
+    uint8_t info_left;
     uint32_t tlast_send_ms;
     uint32_t tlast_byte_ms;
     uint8_t reset_reason;

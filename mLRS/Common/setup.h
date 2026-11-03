@@ -12,6 +12,7 @@
 
 
 #include "setup_types.h"
+#include "skypuff_bind.h"
 #include "hal/hal.h"
 
 
@@ -334,7 +335,7 @@ void setup_default_bindphrase(char* const s, uint8_t config_id, const char* bind
 void setup_default(uint8_t config_id)
 {
     char bind_phrase[6+1];
-    setup_default_bindphrase(bind_phrase, config_id, BIND_PHRASE);
+    setup_default_bindphrase(bind_phrase, config_id, SKYPUFF_BIND_PHRASE()); // skypuff: the module's own, see skypuff_bind.h
     strcpy(Setup.Common[config_id].BindPhrase, bind_phrase);
 
     Setup.Common[config_id].FrequencyBand = SETUP_RF_BAND;
@@ -403,7 +404,7 @@ void _setup_sanitize_config(uint8_t config_id, bool only_rx)
     //-- BindPhrase, FrequencyBand, Mode, Ortho
 
     char bind_phrase[6+1];
-    setup_default_bindphrase(bind_phrase, config_id, BIND_PHRASE);
+    setup_default_bindphrase(bind_phrase, config_id, SKYPUFF_BIND_PHRASE()); // skypuff: the module's own, see skypuff_bind.h
     sanitize_bindphrase(Setup.Common[config_id].BindPhrase, bind_phrase);
 
     if (Setup.Common[config_id].FrequencyBand >= SETUP_FREQUENCY_BAND_NUM) {

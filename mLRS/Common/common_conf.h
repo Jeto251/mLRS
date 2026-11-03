@@ -96,7 +96,10 @@
 
 // BIND_PHRASE lives in an untracked local header — this fork is public.
 // See bind_phrase_local.h.template for how to create it.
-#if __has_include("bind_phrase_local.h")
+// The universal firmware takes the module's phrase instead, see skypuff_bind.h.
+#if defined SKYPUFF_BIND_UNIVERSAL
+    #define BIND_PHRASE                 "mlrs.0" // only for a module which has none
+#elif __has_include("bind_phrase_local.h")
     #include "bind_phrase_local.h"
 #else
     #error "bind_phrase_local.h is missing - copy bind_phrase_local.h.template and set BIND_PHRASE"
@@ -156,6 +159,15 @@
 #define LQ_AVERAGING_MS                 1000
 
 #define SKYPUFF_TELEMETRY_PERIOD_MS         300 // how often the module sends link telemetry to the ESP board
+#define SKYPUFF_MODULE_INFO_FRAMES          10  // module info goes with that many link status frames after the start, the board may still boot
+#ifndef SKYPUFF_UPDATER_WINDOW_MS
+#define SKYPUFF_UPDATER_WINDOW_MS           300   // at the start the module listens that long for the board's update ping, see skypuff_updater.h
+#endif
+#define SKYPUFF_UPDATER_CONFIRM_WINDOW_MS   3000  // a new firmware waits that long to be confirmed, else goes back to the old one
+#define SKYPUFF_UPDATER_REQUESTED_WINDOW_MS 5000  // the window after a restart the board asked for
+#define SKYPUFF_UPDATER_IDLE_MS             5000  // an update session ends when the board is silent that long
+#define SKYPUFF_UPDATER_BAUD                230400
+#define SKYPUFF_UPDATER_RXBUF               4096
 #define SKYPUFF_BUSY_TMO_US                 20000 // tx: longest wait on a sx BUSY pin, see skypuff_radio_guard.h
 #define SKYPUFF_LOOP_WDT_MS                 300 // tx: restarts the module if the main loop got stuck for that long, see esp-timer.h
 #define SKYPUFF_TELEMETRY_MID_FRAME_TMO_MS  500 // stream stuck mid-frame for that long is terminated, covers ARQ retries at 19 Hz

@@ -17,6 +17,7 @@
 
 #define SKYPUFF_FRAME_VERSION           1
 #define SKYPUFF_FRAME_TYPE_LINK_STATUS  1
+#define SKYPUFF_FRAME_TYPE_MODULE_INFO  2 // tSkypuffModuleInfo, with the first SKYPUFF_MODULE_INFO_FRAMES link status frames, and on request
 #define SKYPUFF_FRAME_SRC_TX_MODULE     1
 #define SKYPUFF_FRAME_SRC_RX_MODULE     2
 
@@ -61,6 +62,16 @@ typedef struct __attribute__((packed))
     uint16_t busy_timeouts;     // waits on a sx BUSY pin which ran out, see skypuff_radio_guard.h
     uint8_t radio_restarts;     // radio part restarts because of them
 } tSkypuffLinkStatus; // 86 bytes
+
+
+// What the module is, for the board's settings
+typedef struct __attribute__((packed))
+{
+    uint32_t build_id;
+    char version[12];         // VERSIONONLYSTR
+    char bind_phrase[6];      // the module's, all 0 if it has none, see skypuff_bind.h
+    uint8_t universal;        // 1: a universal firmware, it keeps the module's phrase
+} tSkypuffModuleInfo; // 23 bytes
 
 
 // same as crc16() in the VESC firmware: CCITT, poly 0x1021, init 0
@@ -148,6 +159,17 @@ inline uint16_t skypuff_cobs_decode(const uint8_t* in, uint16_t len, uint8_t* ou
     return pos;
 }
 
+// Standard CRC-32 (zlib, Python zlib.crc32), start with crc = 0
+inline uint32_t skypuff_crc32(uint32_t crc, const uint8_t* buf, uint32_t len)
+{
+    crc = ~crc;
+    for (uint32_t i = 0; i < len; i++) {
+        crc ^= buf[i];
+        for (uint8_t b = 0; b < 8; b++) crc = (crc & 1) ? (crc >> 1) ^ 0xEDB88320 : (crc >> 1);
+    }
+    return ~crc;
+}
+
 // out must hold SKYPUFF_FRAME_MAX_ENCODED_LEN bytes, payload_len must not exceed
 // SKYPUFF_FRAME_MAX_PAYLOAD_LEN. Returns the length including the terminator.
 inline uint16_t skypuff_frame_encode(uint8_t type, uint8_t src, uint8_t seq, const void* payload, uint8_t payload_len, uint8_t* out)
@@ -157,6 +179,61 @@ inline uint16_t skypuff_frame_encode(uint8_t type, uint8_t src, uint8_t seq, con
     return skypuff_cobs_encode(frame, frame_len, out);
 }
 
+
+//-------------------------------------------------------
+// Module update over the serial port, see skypuff_updater.h
+//-------------------------------------------------------
+// Payload byte 0 is the command, the rest little-endian.
+
+#define SKYPUFF_FRAME_TYPE_UPDATE       5
+#define SKYPUFF_FRAME_SRC_ESP           0
+
+#define SKYPUFF_UPDATE_PROTO_VERSION    1
+#define SKYPUFF_UPDATE_CHUNK_LEN        1024 // DATA bytes per frame
+
+// board -> module
+#define SKYPUFF_UPDATE_PING             0x01 // -> READY
+#define SKYPUFF_UPDATE_BEGIN            0x02 // u32 size, u32 crc32 -> ACK(0)
+#define SKYPUFF_UPDATE_DATA             0x03 // u32 offset, data -> ACK(next offset)
+#define SKYPUFF_UPDATE_END              0x04 // -> DONE, the module restarts into the new firmware
+#define SKYPUFF_UPDATE_CONFIRM          0x05 // -> CONFIRMED, the new firmware stays
+#define SKYPUFF_UPDATE_ABORT            0x06 // -> the module boots on
+#define SKYPUFF_UPDATE_RESTART          0x07 // to the running firmware: restart into a long update window
+#define SKYPUFF_UPDATE_SET_BIND         0x08 // char[6] bind phrase -> BIND_SET, see skypuff_bind.h
+#define SKYPUFF_UPDATE_INFO_REQUEST     0x09 // to the running firmware: send tSkypuffModuleInfo again
+
+// module -> board
+#define SKYPUFF_UPDATE_READY            0x81
+#define SKYPUFF_UPDATE_ACK              0x82 // u32 next offset
+#define SKYPUFF_UPDATE_ERROR            0x83 // u8 code, i32 esp_err_t
+#define SKYPUFF_UPDATE_DONE             0x84
+#define SKYPUFF_UPDATE_CONFIRMED        0x85
+#define SKYPUFF_UPDATE_BIND_SET         0x86
+
+#define SKYPUFF_UPDATE_ERR_PENDING      1 // the running firmware isn't confirmed yet
+#define SKYPUFF_UPDATE_ERR_TOO_BIG      2
+#define SKYPUFF_UPDATE_ERR_BEGIN        3
+#define SKYPUFF_UPDATE_ERR_WRITE        4
+#define SKYPUFF_UPDATE_ERR_NOT_STARTED  5
+#define SKYPUFF_UPDATE_ERR_SIZE         6
+#define SKYPUFF_UPDATE_ERR_CRC          7
+#define SKYPUFF_UPDATE_ERR_IMAGE        8 // esp_ota_end() didn't take the image
+#define SKYPUFF_UPDATE_ERR_SET_BOOT     9
+#define SKYPUFF_UPDATE_ERR_COMMAND      10
+#define SKYPUFF_UPDATE_ERR_BIND         11 // not a valid phrase, can't store it, or the firmware has its own
+
+typedef struct __attribute__((packed))
+{
+    uint8_t cmd;              // SKYPUFF_UPDATE_READY
+    uint8_t proto_version;
+    uint8_t src;              // SKYPUFF_FRAME_SRC_TX_MODULE or _RX_MODULE
+    uint8_t pending;          // 1: running a new firmware which waits for CONFIRM
+    uint8_t running_slot;     // 0: app0, 1: app1
+    uint32_t build_id;
+    uint16_t chunk_len;
+    char version[12];         // VERSIONONLYSTR
+    char bind_phrase[6];      // the module's, all 0 if it has none, see skypuff_bind.h
+} tSkypuffUpdateReady;
 
 
 #endif // SKYPUFF_FRAME_H

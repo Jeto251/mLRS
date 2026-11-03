@@ -161,6 +161,7 @@ tTxMsp msp;
 
 
 #include "../Common/skypuff_telemetry.h"
+#include "../Common/skypuff_updater.h"
 
 tSkypuffTelemetry skypuff_telemetry;
 
@@ -773,10 +774,23 @@ void main_loop(void)
 #endif
 INITCONTROLLER_ONCE
     skypuff_crash_capture(); // before the sx chips get touched
+    skypuff_trace_start();
+    SKYPUFF_TRACE("crash: crumbs %02x stage %u core %u/%u spi %u/%02x", skypuff_crash_report.crumbs,
+                  skypuff_crash_report.panic_stage, skypuff_crash_report.core, skypuff_crash_report.handler_core,
+                  skypuff_crash_report.spi_state, skypuff_crash_report.spi_cmd);
+    SKYPUFF_TRACE("crash pc0: %08x %08x %08x %08x %08x %08x", skypuff_crash_report.pc[0][0], skypuff_crash_report.pc[0][1],
+                  skypuff_crash_report.pc[0][2], skypuff_crash_report.pc[0][3], skypuff_crash_report.pc[0][4], skypuff_crash_report.pc[0][5]);
+    SKYPUFF_TRACE("crash pc1: %08x %08x %08x %08x %08x %08x", skypuff_crash_report.pc[1][0], skypuff_crash_report.pc[1][1],
+                  skypuff_crash_report.pc[1][2], skypuff_crash_report.pc[1][3], skypuff_crash_report.pc[1][4], skypuff_crash_report.pc[1][5]);
+    skypuff_bind_load(); // the module's bind phrase, the updater reports it
+    SKYPUFF_UPDATER_BOOT(SKYPUFF_FRAME_SRC_TX_MODULE); // the board may update the firmware, before the radio starts
+    SKYPUFF_TRACE("updater done");
     stack_check_init();
     init_once();
 RESTARTCONTROLLER
+    SKYPUFF_TRACE("init_hw");
     init_hw();
+    SKYPUFF_TRACE("init_hw done, busy timeouts %u", skypuff_busy_timeouts);
     DBG_MAIN(dbg.puts("\n\n\nHello\n\n");)
 
     // startup sign of life
@@ -793,6 +807,7 @@ RESTARTCONTROLLER
     fhss.Init(&Config.Fhss, &Config.Fhss2);
     fhss.Start();
     rfpower.Init();
+    SKYPUFF_TRACE("sx started, busy timeouts %u", skypuff_busy_timeouts);
 
     sx.SetRfFrequency(fhss.GetCurrFreq());
     sx2.SetRfFrequency(fhss.GetCurrFreq2());
@@ -843,9 +858,23 @@ RESTARTCONTROLLER
     tick_1hz = 0;
     tick_1hz_commensurate = 0;
     resetSysTask(); // helps in avoiding too short first loop
+    SKYPUFF_TRACE("inits done, busy timeouts %u", skypuff_busy_timeouts);
 INITCONTROLLER_END
 
     SKYPUFF_LOOP_WDT_BEAT(); // the inits are done, from here on every loop beats
+#ifdef SKYPUFF_BOOT_TRACE
+    {
+        static uint32_t last_ms = 0, alive_ms = 0, loops = 0;
+        uint32_t t_ms = millis();
+        loops++;
+        if (last_ms && t_ms - last_ms > 50) SKYPUFF_TRACE("slow loop %u ms", t_ms - last_ms);
+        last_ms = t_ms;
+        if (t_ms - alive_ms >= 250 && t_ms < 8000) {
+            alive_ms = t_ms;
+            SKYPUFF_TRACE("loop %u, link %d connect %d, busy timeouts %u", loops, link_state, connect_state, skypuff_busy_timeouts);
+        }
+    }
+#endif
 
     switch (skypuff_radio_guard_action()) { // a sx chip got stuck on BUSY, see skypuff_radio_guard.h
     case SKYPUFF_RADIO_RESTART:
@@ -1267,6 +1296,12 @@ IF_IN(
     mavlink.Do();
     msp.Do();
 
+#if defined ESP32 && defined SKYPUFF_UPDATER_WINDOW_MS
+    // skypuff: without a link nothing reads the serial port, not even the tx while it
+    // asks for the receiver's setup. The board's restart request has to get through
+    // anyway, see skypuff_updater_sniff(). What a lost link drops is stale.
+    if (!connected()) sx_serial.flush();
+#endif
     skypuff_telemetry.Do(connected());
 
     //-- Do WhileTransmit stuff

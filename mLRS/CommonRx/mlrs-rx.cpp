@@ -128,6 +128,7 @@ tRxMavlink mavlink;
 tRxMsp msp;
 
 #include "../Common/skypuff_telemetry.h"
+#include "../Common/skypuff_updater.h"
 
 tSkypuffTelemetry skypuff_telemetry;
 
@@ -575,6 +576,8 @@ void main_loop(void)
 #endif
 INITCONTROLLER_ONCE
     skypuff_crash_capture(); // before the sx chips get touched
+    skypuff_bind_load(); // the module's bind phrase, the updater reports it
+    SKYPUFF_UPDATER_BOOT(SKYPUFF_FRAME_SRC_RX_MODULE); // the board may update the firmware, before the radio starts
     stack_check_init();
 RESTARTCONTROLLER
     init_hw();
@@ -999,6 +1002,12 @@ dbg.puts(s8toBCD_s(stats.last_rssi2));*/
 
     out.Do();
 
+#if defined ESP32 && defined SKYPUFF_UPDATER_WINDOW_MS
+    // skypuff: without a link nothing reads the serial port, not even the tx while it
+    // asks for the receiver's setup. The board's restart request has to get through
+    // anyway, see skypuff_updater_sniff(). What a lost link drops is stale.
+    if (!connected()) sx_serial.flush();
+#endif
     skypuff_telemetry.Do(connected());
 
     //-- Do MAVLink & MSP & DroneCAN
