@@ -69,7 +69,11 @@ class tLEDs
         if (connected) {
             if (!blink) led_green_toggle();
         } else {
+#ifdef DEVICE_IS_RECEIVER
+            if (!blink) led_orange_toggle(); // skypuff: the receiver searches in orange, the transmitter in red
+#else
             if (!blink) led_red_toggle();
+#endif
         }
 #else
         if (connected) {
