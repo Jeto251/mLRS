@@ -16,6 +16,9 @@
 #define SX128X_DRIVER_H
 #pragma once
 
+#include "../skypuff_crash.h"
+#include "../skypuff_radio_guard.h"
+
 
 //-------------------------------------------------------
 // SX Driver
@@ -356,11 +359,21 @@ class Sx128xDriver : public Sx128xDriverCommon
 
     void WaitOnBusy(void) override
     {
+        SKYPUFF_CRUMB_SET(SKYPUFF_CRUMB_BUSY_SX);
+#ifdef SKYPUFF_BUSY_BOUNDED
+        uint32_t t0_us = micros();
+        while (sx_busy_read()) {
+            if (micros() - t0_us > SKYPUFF_BUSY_TMO_US) { skypuff_busy_timeout(); break; }
+        }
+#else
         while (sx_busy_read()) { __NOP(); };
+#endif
+        SKYPUFF_CRUMB_CLEAR(SKYPUFF_CRUMB_BUSY_SX);
     }
 
     void SpiSelect(void) override
     {
+        skypuff_spi_select(0);
         spi_select();
         delay_ns(50); // datasheet says t1 = 25 ns, semtech driver doesn't do it, helps so do it
     }
@@ -369,21 +382,28 @@ class Sx128xDriver : public Sx128xDriverCommon
     {
         delay_ns(50); // datasheet says t8 = 25 ns, semtech driver doesn't do it, helps so do it
         spi_deselect();
+        skypuff_spi_deselect(0);
     }
 
     void SpiTransfer(uint8_t* dataout, uint8_t* datain, uint8_t len) override
     {
+        skypuff_spi_transfer(0, dataout ? dataout[0] : 0xFF);
         spi_transfer(dataout, datain, len);
+        skypuff_spi_transferred(0);
     }
 
     void SpiRead(uint8_t* datain, uint8_t len) override
     {
+        skypuff_spi_transfer(0, SKYPUFF_SPI_CMD_READ);
         spi_read(datain, len);
+        skypuff_spi_transferred(0);
     }
 
     void SpiWrite(uint8_t* dataout, uint8_t len) override
     {
+        skypuff_spi_transfer(0, dataout ? dataout[0] : 0xFF);
         spi_write(dataout, len);
+        skypuff_spi_transferred(0);
     }
 
     //-- RF power interface
@@ -490,11 +510,21 @@ class Sx128xDriver2 : public Sx128xDriverCommon
 
     void WaitOnBusy(void) override
     {
+        SKYPUFF_CRUMB_SET(SKYPUFF_CRUMB_BUSY_SX2);
+#ifdef SKYPUFF_BUSY_BOUNDED
+        uint32_t t0_us = micros();
+        while (sx2_busy_read()) {
+            if (micros() - t0_us > SKYPUFF_BUSY_TMO_US) { skypuff_busy_timeout(); break; }
+        }
+#else
         while (sx2_busy_read()) { __NOP(); };
+#endif
+        SKYPUFF_CRUMB_CLEAR(SKYPUFF_CRUMB_BUSY_SX2);
     }
 
     void SpiSelect(void) override
     {
+        skypuff_spi_select(1);
         spib_select();
         delay_ns(50); // datasheet says t1 = 25 ns, semtech driver doesn't do it, helps so do it
     }
@@ -503,37 +533,50 @@ class Sx128xDriver2 : public Sx128xDriverCommon
     {
         delay_ns(50); // datasheet says t8 = 25 ns, semtech driver doesn't do it, helps so do it
         spib_deselect();
+        skypuff_spi_deselect(1);
     }
 
 #ifndef DEVICE_HAS_DIVERSITY_SINGLE_SPI
     void SpiTransfer(uint8_t* dataout, uint8_t* datain, uint8_t len) override
     {
+        skypuff_spi_transfer(1, dataout ? dataout[0] : 0xFF);
         spib_transfer(dataout, datain, len);
+        skypuff_spi_transferred(1);
     }
 
     void SpiRead(uint8_t* datain, uint8_t len) override
     {
+        skypuff_spi_transfer(1, SKYPUFF_SPI_CMD_READ);
         spib_read(datain, len);
+        skypuff_spi_transferred(1);
     }
 
     void SpiWrite(uint8_t* dataout, uint8_t len) override
     {
+        skypuff_spi_transfer(1, dataout ? dataout[0] : 0xFF);
         spib_write(dataout, len);
+        skypuff_spi_transferred(1);
     }
 #else
     void SpiTransfer(uint8_t* dataout, uint8_t* datain, uint8_t len) override
     {
+        skypuff_spi_transfer(1, dataout ? dataout[0] : 0xFF);
         spi_transfer(dataout, datain, len);
+        skypuff_spi_transferred(1);
     }
 
     void SpiRead(uint8_t* datain, uint8_t len) override
     {
+        skypuff_spi_transfer(1, SKYPUFF_SPI_CMD_READ);
         spi_read(datain, len);
+        skypuff_spi_transferred(1);
     }
 
     void SpiWrite(uint8_t* dataout, uint8_t len) override
     {
+        skypuff_spi_transfer(1, dataout ? dataout[0] : 0xFF);
         spi_write(dataout, len);
+        skypuff_spi_transferred(1);
     }
 #endif
 

@@ -55,6 +55,7 @@ class tRxSxSerial : public tSerialBase
             return;
         }
         serial->putbuf(buf, len); // send to serial
+        skypuff_telemetry.OnSerialOut(buf, len);
     }
 
     void flush(void) override

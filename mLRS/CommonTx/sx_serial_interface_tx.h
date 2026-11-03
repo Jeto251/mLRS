@@ -17,6 +17,7 @@ extern tGlobalConfig Config;
 extern tSerialPorts Serials;
 extern tTxMavlink mavlink;
 extern tTxMsp msp;
+extern tSkypuffTelemetry skypuff_telemetry;
 
 
 class tTxSxSerial : public tSerialBase
@@ -97,6 +98,7 @@ void tTxSxSerial::putbuf(uint8_t* const buf, uint16_t len)
         return;
     }
     ser->putbuf(buf, len);
+    skypuff_telemetry.OnSerialOut(buf, len);
 }
 
 

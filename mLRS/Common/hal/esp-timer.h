@@ -60,10 +60,32 @@ static bool systick_millis_initialized = false;
 volatile uint32_t CNT_10us = 0;
 volatile uint32_t MS_C = 0;
 
+#ifdef SKYPUFF_LOOP_WDT_MS
+// skypuff: main loop watchdog. Nothing else watches the loop task, so a loop stuck in
+// plain code, like waiting on a sx BUSY pin or on the SPI hardware, would hang the
+// module for good. The main loop beats, this 1 ms tick checks the beat. The inits take
+// longer, so it's armed only once they are done. A loop stuck with the interrupts off
+// stops this tick too, then the interrupt watchdog of ESP-IDF restarts the module.
+volatile uint32_t skypuff_loop_beat_ms = 0;
+volatile bool skypuff_loop_wdt_armed = false;
+
+#define SKYPUFF_LOOP_WDT_BEAT()    { skypuff_loop_beat_ms = uwTick; skypuff_loop_wdt_armed = true; }
+#define SKYPUFF_LOOP_WDT_DISARM()  { skypuff_loop_wdt_armed = false; }
+#else
+#define SKYPUFF_LOOP_WDT_BEAT()
+#define SKYPUFF_LOOP_WDT_DISARM()
+#endif
+
 IRQHANDLER(
 void CLOCK_IRQHandler(void)
 {
     HAL_IncTick();
+#ifdef SKYPUFF_LOOP_WDT_MS
+    if (skypuff_loop_wdt_armed && (uwTick - skypuff_loop_beat_ms) > SKYPUFF_LOOP_WDT_MS) {
+        skypuff_loop_wdt_armed = false;
+        esp_system_abort("skypuff: main loop stuck");
+    }
+#endif
 })
 
 

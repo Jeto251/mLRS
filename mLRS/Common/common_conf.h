@@ -155,6 +155,11 @@
 
 #define LQ_AVERAGING_MS                 1000
 
+#define SKYPUFF_TELEMETRY_PERIOD_MS         300 // how often the module sends link telemetry to the ESP board
+#define SKYPUFF_BUSY_TMO_US                 20000 // tx: longest wait on a sx BUSY pin, see skypuff_radio_guard.h
+#define SKYPUFF_LOOP_WDT_MS                 300 // tx: restarts the module if the main loop got stuck for that long, see esp-timer.h
+#define SKYPUFF_TELEMETRY_MID_FRAME_TMO_MS  500 // stream stuck mid-frame for that long is terminated, covers ARQ retries at 19 Hz
+
 
 #define TX_SERIAL_BAUDRATE              115200 // will be overwritten by setup
 #define TX_SERIAL_TXBUFSIZE             512

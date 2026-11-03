@@ -160,6 +160,10 @@ uint8_t mavlink_vehicle_state(void)
 tTxMsp msp;
 
 
+#include "../Common/skypuff_telemetry.h"
+
+tSkypuffTelemetry skypuff_telemetry;
+
 #include "sx_serial_interface_tx.h"
 
 tTxSxSerial sx_serial;
@@ -262,7 +266,10 @@ void init_hw(void)
     delay_init();
     systembootloader_init(); // after delay_init() since it may need delay
     timer_init();
+    tSkypuffAdcState adc_state;
+    adc_state.Save();
     trng_init();
+    adc_state.Restore();
 
     leds_init();
     button_init();
@@ -303,42 +310,73 @@ void init_hw(void)
 volatile uint32_t irq_status;
 volatile uint32_t irq2_status;
 
+// skypuff: the sx isrs only flag the event, the SPI work is done by service_sx_dio() in the main
+// loop. Both sx chips share one SPI bus, and an isr doing SPI could cut into a transfer of the
+// main loop. The main loop looked at irq_status only after the isr anyway.
+volatile bool sx_dio_pending = false;
+volatile bool sx2_dio_pending = false;
+
 IRQHANDLER(
 void SX_DIO_EXTI_IRQHandler(void)
 {
+    skypuff_isr_enter(SKYPUFF_CRUMB_ISR_SX);
     sx_dio_exti_isr_clearflag();
-    irq_status = sx.GetAndClearIrqStatus(SX_IRQ_ALL);
-    if (irq_status & SX_IRQ_RX_DONE) {
-        if (bind.IsInBind()) {
-            uint64_t bind_signature;
-            sx.ReadBuffer(0, (uint8_t*)&bind_signature, 8);
-            if (bind_signature != bind.RxSignature) irq_status = 0; // not binding frame, so ignore it
-        } else {
-            uint16_t sync_word;
-            sx.ReadBuffer(0, (uint8_t*)&sync_word, 2); // rxStartBufferPointer is always 0, so no need for sx.GetRxBufferStatus()
-            if (sync_word != Config.FrameSyncWord) irq_status = 0; // not for us, so ignore it
-        }
-    }
+    sx_dio_pending = true;
+    skypuff_isr_exit(SKYPUFF_CRUMB_ISR_SX);
 })
 #ifdef USE_SX2
 IRQHANDLER(
 void SX2_DIO_EXTI_IRQHandler(void)
 {
+    skypuff_isr_enter(SKYPUFF_CRUMB_ISR_SX2);
     sx2_dio_exti_isr_clearflag();
-    irq2_status = sx2.GetAndClearIrqStatus(SX2_IRQ_ALL);
-    if (irq2_status & SX2_IRQ_RX_DONE) {
-        if (bind.IsInBind()) {
-            uint64_t bind_signature;
-            sx2.ReadBuffer(0, (uint8_t*)&bind_signature, 8);
-            if (bind_signature != bind.RxSignature) irq2_status = 0;
-        } else {
-            uint16_t sync_word;
-            sx2.ReadBuffer(0, (uint8_t*)&sync_word, 2);
-            if (sync_word != Config.FrameSyncWord) irq2_status = 0;
-        }
-    }
+    sx2_dio_pending = true;
+    skypuff_isr_exit(SKYPUFF_CRUMB_ISR_SX2);
 })
 #endif
+
+// What the isrs did before. The crumbs mark it like the isr, it handles the same event.
+void service_sx_dio(void)
+{
+    if (sx_dio_pending) {
+        sx_dio_pending = false; // a new isr from here on gets serviced in the next loop
+        skypuff_isr_enter(SKYPUFF_CRUMB_ISR_SX);
+        uint32_t status = sx.GetAndClearIrqStatus(SX_IRQ_ALL);
+        if (status & SX_IRQ_RX_DONE) {
+            if (bind.IsInBind()) {
+                uint64_t bind_signature;
+                sx.ReadBuffer(0, (uint8_t*)&bind_signature, 8);
+                if (bind_signature != bind.RxSignature) status = 0; // not binding frame, so ignore it
+            } else {
+                uint16_t sync_word;
+                sx.ReadBuffer(0, (uint8_t*)&sync_word, 2); // rxStartBufferPointer is always 0, so no need for sx.GetRxBufferStatus()
+                if (sync_word != Config.FrameSyncWord) status = 0; // not for us, so ignore it
+            }
+        }
+        irq_status = status;
+        skypuff_isr_exit(SKYPUFF_CRUMB_ISR_SX);
+    }
+#ifdef USE_SX2
+    if (sx2_dio_pending) {
+        sx2_dio_pending = false;
+        skypuff_isr_enter(SKYPUFF_CRUMB_ISR_SX2);
+        uint32_t status = sx2.GetAndClearIrqStatus(SX2_IRQ_ALL);
+        if (status & SX2_IRQ_RX_DONE) {
+            if (bind.IsInBind()) {
+                uint64_t bind_signature;
+                sx2.ReadBuffer(0, (uint8_t*)&bind_signature, 8);
+                if (bind_signature != bind.RxSignature) status = 0;
+            } else {
+                uint16_t sync_word;
+                sx2.ReadBuffer(0, (uint8_t*)&sync_word, 2);
+                if (sync_word != Config.FrameSyncWord) status = 0;
+            }
+        }
+        irq2_status = status;
+        skypuff_isr_exit(SKYPUFF_CRUMB_ISR_SX2);
+    }
+#endif
+}
 
 
 uint8_t link_rx1_status;
@@ -734,6 +772,7 @@ void main_loop(void)
     main_test();
 #endif
 INITCONTROLLER_ONCE
+    skypuff_crash_capture(); // before the sx chips get touched
     stack_check_init();
     init_once();
 RESTARTCONTROLLER
@@ -787,6 +826,8 @@ RESTARTCONTROLLER
     mavlink.Init(&crsf); // serial ports selected by SerialPort, SerialPort2, ChannelsSource
     msp.Init(); // serial port selected by SerialPort
     sx_serial.Init(&crsf); // serial port selected by SerialPort, ChannelsSource
+    skypuff_telemetry.Init((Setup.Tx[Config.ConfigId].SerialPort == TX_SERIAL_PORT_CRSF_BRIDGE) ? nullptr : Serials.serial,
+                           SKYPUFF_FRAME_SRC_TX_MODULE);
     cli.Init();
     espbridge.Init();
     hc04bridge.Init();
@@ -803,6 +844,16 @@ RESTARTCONTROLLER
     tick_1hz_commensurate = 0;
     resetSysTask(); // helps in avoiding too short first loop
 INITCONTROLLER_END
+
+    SKYPUFF_LOOP_WDT_BEAT(); // the inits are done, from here on every loop beats
+
+    switch (skypuff_radio_guard_action()) { // a sx chip got stuck on BUSY, see skypuff_radio_guard.h
+    case SKYPUFF_RADIO_RESTART:
+        SKYPUFF_LOOP_WDT_DISARM(); // the inits take longer
+        GOTO_RESTARTCONTROLLER;
+    case SKYPUFF_RADIO_REBOOT:
+        esp_restart();
+    }
 
     //-- SysTask handling
 
@@ -864,6 +915,8 @@ INITCONTROLLER_END
     }
 
     //-- SX handling
+
+    service_sx_dio(); // before anything looks at irq_status
 
     switch (link_state) {
     case LINK_STATE_IDLE:
@@ -1119,6 +1172,7 @@ IF_SX2(
             sx.SetToIdle(); // should not be needed, should not hurt either
             sx2.SetToIdle();
             leds.SetToParamStore();
+            SKYPUFF_LOOP_WDT_DISARM(); // the flash write and the inits after it take longer
             setup_store_to_EEPROM();
             GOTO_RESTARTCONTROLLER;
         }
@@ -1213,6 +1267,8 @@ IF_IN(
     mavlink.Do();
     msp.Do();
 
+    skypuff_telemetry.Do(connected());
+
     //-- Do WhileTransmit stuff
 
     whileTransmit.Do();
@@ -1244,12 +1300,12 @@ IF_IN(
         break;
     case TASK_BIND_START: bind.StartBind(); break;
     case TASK_BIND_STOP: bind.StopBind(); break;
-    case TASK_SYSTEM_BOOT: enter_system_bootloader(); break;
+    case TASK_SYSTEM_BOOT: SKYPUFF_LOOP_WDT_DISARM(); enter_system_bootloader(); break;
     case TASK_CHANGE_CONFIG_ID: config_id.Change(tasks.GetConfigIdValue()); break;
     }
     espbridge.HandleTask(tx_task, tasks.GetEspBridgeStr());
     hc04bridge.HandleTask(tx_task, tasks.GetHc04BridgeValue());
-    if (tx_task == TASK_RESTART_CONTROLLER) { GOTO_RESTARTCONTROLLER; }
+    if (tx_task == TASK_RESTART_CONTROLLER) { SKYPUFF_LOOP_WDT_DISARM(); GOTO_RESTARTCONTROLLER; }
 
     //-- Handle ESP wifi bridge
 

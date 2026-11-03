@@ -127,6 +127,10 @@ tRxMavlink mavlink;
 
 tRxMsp msp;
 
+#include "../Common/skypuff_telemetry.h"
+
+tSkypuffTelemetry skypuff_telemetry;
+
 #include "sx_serial_interface_rx.h"
 
 tRxSxSerial sx_serial;
@@ -179,6 +183,7 @@ volatile uint32_t irq2_status;
 IRQHANDLER(
 void SX_DIO_EXTI_IRQHandler(void)
 {
+    skypuff_isr_enter(SKYPUFF_CRUMB_ISR_SX);
     sx_dio_exti_isr_clearflag();
     irq_status = sx.GetAndClearIrqStatus(SX_IRQ_ALL);
     if (irq_status & SX_IRQ_RX_DONE) {
@@ -192,11 +197,13 @@ void SX_DIO_EXTI_IRQHandler(void)
             if (sync_word != Config.FrameSyncWord) irq_status = 0; // not for us, so ignore it
         }
     }
+    skypuff_isr_exit(SKYPUFF_CRUMB_ISR_SX);
 })
 #ifdef USE_SX2
 IRQHANDLER(
 void SX2_DIO_EXTI_IRQHandler(void)
 {
+    skypuff_isr_enter(SKYPUFF_CRUMB_ISR_SX2);
     sx2_dio_exti_isr_clearflag();
     irq2_status = sx2.GetAndClearIrqStatus(SX2_IRQ_ALL);
     if (irq2_status & SX2_IRQ_RX_DONE) {
@@ -210,6 +217,7 @@ void SX2_DIO_EXTI_IRQHandler(void)
             if (sync_word != Config.FrameSyncWord) irq2_status = 0;
         }
     }
+    skypuff_isr_exit(SKYPUFF_CRUMB_ISR_SX2);
 })
 #endif
 
@@ -566,6 +574,7 @@ void main_loop(void)
     main_test();
 #endif
 INITCONTROLLER_ONCE
+    skypuff_crash_capture(); // before the sx chips get touched
     stack_check_init();
 RESTARTCONTROLLER
     init_hw();
@@ -615,6 +624,7 @@ RESTARTCONTROLLER
     mavlink.Init();
     msp.Init();
     sx_serial.Init();
+    skypuff_telemetry.Init(serial, SKYPUFF_FRAME_SRC_RX_MODULE);
     fan.SetPower(SX_OR_SX2(sx.RfPower_dbm(),sx2.RfPower_dbm()));
     dronecan.Start();
 
@@ -988,6 +998,8 @@ dbg.puts(s8toBCD_s(stats.last_rssi2));*/
     }//end of if(doPostReceive2)
 
     out.Do();
+
+    skypuff_telemetry.Do(connected());
 
     //-- Do MAVLink & MSP & DroneCAN
 
