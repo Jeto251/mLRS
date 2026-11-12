@@ -577,6 +577,7 @@ void main_loop(void)
 INITCONTROLLER_ONCE
     skypuff_crash_capture(); // before the sx chips get touched
     skypuff_bind_load(); // the module's bind phrase, the updater reports it
+    skypuff_temp_load(); // its temperature calibration
     SKYPUFF_UPDATER_BOOT(SKYPUFF_FRAME_SRC_RX_MODULE); // the board may update the firmware, before the radio starts
     stack_check_init();
 RESTARTCONTROLLER

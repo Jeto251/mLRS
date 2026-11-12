@@ -783,6 +783,7 @@ INITCONTROLLER_ONCE
     SKYPUFF_TRACE("crash pc1: %08x %08x %08x %08x %08x %08x", skypuff_crash_report.pc[1][0], skypuff_crash_report.pc[1][1],
                   skypuff_crash_report.pc[1][2], skypuff_crash_report.pc[1][3], skypuff_crash_report.pc[1][4], skypuff_crash_report.pc[1][5]);
     skypuff_bind_load(); // the module's bind phrase, the updater reports it
+    skypuff_temp_load(); // its temperature calibration
     SKYPUFF_UPDATER_BOOT(SKYPUFF_FRAME_SRC_TX_MODULE); // the board may update the firmware, before the radio starts
     SKYPUFF_TRACE("updater done");
     stack_check_init();

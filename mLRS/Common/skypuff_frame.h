@@ -201,6 +201,7 @@ inline uint16_t skypuff_frame_encode(uint8_t type, uint8_t src, uint8_t seq, con
 #define SKYPUFF_UPDATE_RESTART          0x07 // to the running firmware: restart into a long update window
 #define SKYPUFF_UPDATE_SET_BIND         0x08 // char[6] bind phrase -> BIND_SET, see skypuff_bind.h
 #define SKYPUFF_UPDATE_INFO_REQUEST     0x09 // to the running firmware: send tSkypuffModuleInfo again
+#define SKYPUFF_UPDATE_SET_TEMP         0x0A // i16 actual temperature in 0.1 C, SKYPUFF_TEMP_RESET drops it -> TEMP_SET, see skypuff_temp.h
 
 // module -> board
 #define SKYPUFF_UPDATE_READY            0x81
@@ -209,6 +210,7 @@ inline uint16_t skypuff_frame_encode(uint8_t type, uint8_t src, uint8_t seq, con
 #define SKYPUFF_UPDATE_DONE             0x84
 #define SKYPUFF_UPDATE_CONFIRMED        0x85
 #define SKYPUFF_UPDATE_BIND_SET         0x86
+#define SKYPUFF_UPDATE_TEMP_SET         0x87 // i16 offset now, i16 sensor reading, both in 0.1 C
 
 #define SKYPUFF_UPDATE_ERR_PENDING      1 // the running firmware isn't confirmed yet
 #define SKYPUFF_UPDATE_ERR_TOO_BIG      2
@@ -221,6 +223,7 @@ inline uint16_t skypuff_frame_encode(uint8_t type, uint8_t src, uint8_t seq, con
 #define SKYPUFF_UPDATE_ERR_SET_BOOT     9
 #define SKYPUFF_UPDATE_ERR_COMMAND      10
 #define SKYPUFF_UPDATE_ERR_BIND         11 // not a valid phrase, can't store it, or the firmware has its own
+#define SKYPUFF_UPDATE_ERR_TEMP         12 // the offset would be out of range, or can't store it
 
 typedef struct __attribute__((packed))
 {
@@ -233,6 +236,8 @@ typedef struct __attribute__((packed))
     uint16_t chunk_len;
     char version[12];         // VERSIONONLYSTR
     char bind_phrase[6];      // the module's, all 0 if it has none, see skypuff_bind.h
+    int16_t temp_c10;         // calibrated temperature now, in 0.1 C, see skypuff_temp.h
+    int16_t temp_offset_c10;  // its calibration offset
 } tSkypuffUpdateReady;
 
 

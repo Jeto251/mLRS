@@ -16,6 +16,7 @@
 #include "skypuff_crash.h"
 #include "skypuff_radio_guard.h"
 #include "skypuff_bind.h"
+#include "skypuff_temp.h"
 #ifdef ESP32
 #include <esp_system.h>
 #endif
@@ -191,7 +192,7 @@ class tSkypuffTelemetry
     int8_t read_temperature(void)
     {
 #ifdef ESP32
-        float t = temperatureRead();
+        float t = skypuff_temp_read(); // calibrated, see skypuff_temp.h
         return (t < -127.0f) ? -127 : (t > 127.0f) ? 127 : (int8_t)lroundf(t);
 #else
         return SKYPUFF_TEMPERATURE_UNKNOWN;

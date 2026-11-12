@@ -24,6 +24,7 @@
 #include "skypuff_frame.h"
 #include "skypuff_crash.h"
 #include "skypuff_bind.h"
+#include "skypuff_temp.h"
 #include "skypuff_telemetry.h"
 
 
@@ -172,6 +173,8 @@ void tSkypuffUpdater::send_ready(void)
     ready.chunk_len = SKYPUFF_UPDATE_CHUNK_LEN;
     strncpy(ready.version, VERSIONONLYSTR, sizeof(ready.version));
     memcpy(ready.bind_phrase, skypuff_bind_phrase, strlen(skypuff_bind_phrase));
+    ready.temp_offset_c10 = skypuff_temp_offset_c10;
+    ready.temp_c10 = skypuff_temp_raw_c10() + skypuff_temp_offset_c10;
     send(&ready, sizeof(ready));
 }
 
@@ -220,6 +223,17 @@ bool tSkypuffUpdater::session(void)
 
         case SKYPUFF_UPDATE_RESTART: // late ones of the board, it restarted already
             break;
+
+        case SKYPUFF_UPDATE_SET_TEMP: {
+            int16_t actual, raw;
+            if (len != 3) { send_error(SKYPUFF_UPDATE_ERR_COMMAND, ESP_OK); break; }
+            memcpy(&actual, &p[1], 2);
+            if (!skypuff_temp_calibrate(actual, &raw)) { send_error(SKYPUFF_UPDATE_ERR_TEMP, ESP_OK); break; }
+            uint8_t r[5] = { SKYPUFF_UPDATE_TEMP_SET };
+            memcpy(&r[1], &skypuff_temp_offset_c10, 2);
+            memcpy(&r[3], &raw, 2);
+            send(r, sizeof(r));
+            break; }
 
         case SKYPUFF_UPDATE_SET_BIND: {
 #ifdef SKYPUFF_BIND_UNIVERSAL
