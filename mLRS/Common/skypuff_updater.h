@@ -236,15 +236,11 @@ bool tSkypuffUpdater::session(void)
             break; }
 
         case SKYPUFF_UPDATE_SET_BIND: {
-#ifdef SKYPUFF_BIND_UNIVERSAL
             char phrase[SKYPUFF_BIND_LEN + 1] = "";
             if (len == 1 + SKYPUFF_BIND_LEN) memcpy(phrase, &p[1], SKYPUFF_BIND_LEN);
             if (!skypuff_bind_store(phrase)) { send_error(SKYPUFF_UPDATE_ERR_BIND, ESP_OK); break; }
             uint8_t c = SKYPUFF_UPDATE_BIND_SET;
             send(&c, 1);
-#else
-            send_error(SKYPUFF_UPDATE_ERR_BIND, ESP_OK); // a customer firmware has its own
-#endif
             break; }
 
         case SKYPUFF_UPDATE_CONFIRM:

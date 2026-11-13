@@ -70,7 +70,7 @@ typedef struct __attribute__((packed))
     uint32_t build_id;
     char version[12];         // VERSIONONLYSTR
     char bind_phrase[6];      // the module's, all 0 if it has none, see skypuff_bind.h
-    uint8_t universal;        // 1: a universal firmware, it keeps the module's phrase
+    uint8_t universal;        // 1: keeps the module's phrase; 0: an old customer firmware, its phrase built in
 } tSkypuffModuleInfo; // 23 bytes
 
 

@@ -2,16 +2,17 @@
 // Skypuff bind phrase store
 //*******************************************************
 // The module keeps its bind phrase in its NVS, apart from the firmware, so an update
-// keeps it. A customer firmware, built with the customer's BIND_PHRASE, writes it
-// there at the start. The universal firmware (SKYPUFF_BIND_UNIVERSAL) is built
-// without one and takes the module's. The updater reports it and sets it on request.
+// keeps it. The firmware has none built in, one firmware fits all modules. The
+// updater reports the phrase and sets it on request, from the board's screen or
+// from the PC.
 //
 // A module from before this store (firmwares before 3.11.2026) has none here, but its
 // firmware had the phrase built in and wrote it to the mLRS setup at every start
-// (SETUP_FORCE_COMMON_CONF). The universal firmware takes it from there once.
+// (SETUP_FORCE_COMMON_CONF). The firmware takes it from there once.
 //
-// SKYPUFF_BIND_MARKER in the image tells the update script which kind of firmware it
-// sends: "SKYPUFF-BIND-PHRASE " followed by the phrase, or by "keep".
+// SKYPUFF_BIND_MARKER in the image tells the board and the update script that the
+// firmware keeps the module's phrase. Customer firmwares until 13.11.2026 had their
+// phrase there instead of "keep" and wrote it to the module at every start.
 //*******************************************************
 #ifndef SKYPUFF_BIND_H
 #define SKYPUFF_BIND_H
@@ -23,11 +24,7 @@
 
 #define SKYPUFF_BIND_LEN    6
 
-#ifdef SKYPUFF_BIND_UNIVERSAL
 #define SKYPUFF_BIND_MARKER "SKYPUFF-BIND-PHRASE keep"
-#else
-#define SKYPUFF_BIND_MARKER "SKYPUFF-BIND-PHRASE " BIND_PHRASE
-#endif
 
 
 // Same rule as in setup.h, which would quietly replace other characters
@@ -116,13 +113,6 @@ void skypuff_bind_load(void)
 #endif
         size_t len = sizeof(s);
         if (nvs_get_str(h, "bind", s, &len) != ESP_OK || !skypuff_bind_valid(s)) s[0] = '\0';
-#ifndef SKYPUFF_BIND_UNIVERSAL
-        if (strcmp(s, BIND_PHRASE) != 0 && skypuff_bind_valid(BIND_PHRASE)) {
-            strcpy(s, BIND_PHRASE);
-            nvs_set_str(h, "bind", s);
-            nvs_commit(h);
-        }
-#else
         if (s[0] == '\0') {
             skypuff_bind_from_mlrs_setup(s);
             if (s[0] != '\0') {
@@ -130,14 +120,12 @@ void skypuff_bind_load(void)
                 nvs_commit(h);
             }
         }
-#endif
         nvs_close(h);
     }
     strcpy(skypuff_bind_phrase, s);
 }
 
-// False if the phrase isn't valid or couldn't be stored. A customer firmware writes
-// its own again at the next start.
+// False if the phrase isn't valid or couldn't be stored
 bool skypuff_bind_store(const char* s)
 {
     if (!skypuff_bind_valid(s)) return false;

@@ -94,16 +94,9 @@
 
 //python3 ~/Documents/mLRS-Flasher/thirdparty/esptool/esptool.py  --port /dev/ttyUSB0 erase_flash
 
-// BIND_PHRASE lives in an untracked local header — this fork is public.
-// See bind_phrase_local.h.template for how to create it.
-// The universal firmware takes the module's phrase instead, see skypuff_bind.h.
-#if defined SKYPUFF_BIND_UNIVERSAL
-    #define BIND_PHRASE                 "mlrs.0" // only for a module which has none
-#elif __has_include("bind_phrase_local.h")
-    #include "bind_phrase_local.h"
-#else
-    #error "bind_phrase_local.h is missing - copy bind_phrase_local.h.template and set BIND_PHRASE"
-#endif
+// Skypuff: no phrase in the firmware, the module keeps its own, see skypuff_bind.h.
+// This one only for a module which has none yet.
+#define BIND_PHRASE                     "mlrs.0"
 
 
 // #define SETUP_MODE                      MODE_50HZ

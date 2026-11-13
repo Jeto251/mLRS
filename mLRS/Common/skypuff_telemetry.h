@@ -180,9 +180,7 @@ class tSkypuffTelemetry
 #ifdef ESP32
         memcpy(info.bind_phrase, skypuff_bind_phrase, strlen(skypuff_bind_phrase));
 #endif
-#ifdef SKYPUFF_BIND_UNIVERSAL
-        info.universal = 1;
-#endif
+        info.universal = 1; // firmwares before 13.11.2026 could also be customer ones, with a phrase built in
         uint8_t encoded[SKYPUFF_FRAME_MAX_ENCODED_LEN];
         uint16_t len = skypuff_frame_encode(SKYPUFF_FRAME_TYPE_MODULE_INFO, src, seq++,
                                             &info, sizeof(info), encoded);
