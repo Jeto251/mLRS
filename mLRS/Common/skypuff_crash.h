@@ -257,7 +257,23 @@ void skypuff_crash_capture(void) {}
 #endif
 
 
-// Tells which firmware build the crash PCs belong to, to pick the right .elf
+// Tells which firmware build the crash PCs belong to, to pick the right .elf, and
+// the board whether a release has another firmware. From the source for the
+// Skypuff envs, see tools/skypuff_build_id.py: even for committed source. Else from
+// the time of the build.
+#if __has_include("skypuff_build_id.h")
+#include "skypuff_build_id.h"
+
+// In the image for scripts/publish_release.py of skypuff_rc
+const char skypuff_build_marker[] = "SKYPUFF-BUILD-ID " SKYPUFF_BUILD_ID_STR;
+
+inline uint32_t skypuff_build_id(void)
+{
+    // nothing reads the marker, this keeps the linker from dropping it
+    __asm__ volatile("" : : "r"(skypuff_build_marker));
+    return SKYPUFF_BUILD_ID;
+}
+#else
 inline uint32_t skypuff_build_id(void)
 {
     const char* s = __DATE__ " " __TIME__;
@@ -268,6 +284,7 @@ inline uint32_t skypuff_build_id(void)
     }
     return h;
 }
+#endif
 
 
 #endif // SKYPUFF_CRASH_H
